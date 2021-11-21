@@ -1,9 +1,9 @@
 {
-	"name": "logcsvtoSynapse",
+	"name": "parquetToSynapse",
 	"properties": {
 		"activities": [
 			{
-				"name": "logcsvtoSynapse",
+				"name": "copyFromParquetToSynapse",
 				"type": "Copy",
 				"dependsOn": [],
 				"policy": {
