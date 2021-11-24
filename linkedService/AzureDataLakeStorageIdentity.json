@@ -1,0 +1,10 @@
+{
+	"name": "AzureDataLakeStorageIdentity",
+	"properties": {
+		"annotations": [],
+		"type": "AzureBlobFS",
+		"typeProperties": {
+			"url": "https://datalakestoragedp203.dfs.core.windows.net/"
+		}
+	}
+}
