@@ -13,6 +13,63 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/DimProductMaxSK')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureSynapseAnalytics",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlDWTable",
+				"schema": [
+					{
+						"name": "ProductSK",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "ProductID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "ProductModelID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "ProductSubcategoryID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "ProductName",
+						"type": "varchar"
+					},
+					{
+						"name": "SafetyStockLevel",
+						"type": "smallint",
+						"precision": 5
+					},
+					{
+						"name": "ProductModelName",
+						"type": "varchar"
+					},
+					{
+						"name": "ProductSubCategoryName",
+						"type": "varchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "DimProduct"
+				}
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/CopyPipeline_jib')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -697,6 +754,13 @@
 								"type": "DatasetReference"
 							},
 							"name": "ProductSubcategoryStream"
+						},
+						{
+							"dataset": {
+								"referenceName": "DimProductMaxSK",
+								"type": "DatasetReference"
+							},
+							"name": "DimProductStream"
 						}
 					],
 					"sinks": [
@@ -706,6 +770,9 @@
 								"type": "DatasetReference"
 							},
 							"name": "DimProduct"
+						},
+						{
+							"name": "ProductSKCache"
 						}
 					],
 					"transformations": [
@@ -723,12 +790,17 @@
 						},
 						{
 							"name": "SurrogateKey"
+						},
+						{
+							"name": "DerivedColumn1"
 						}
 					],
-					"script": "source(output(\n\t\tProductID as integer,\n\t\tName as string,\n\t\tProductNumber as string,\n\t\tMakeFlag as boolean,\n\t\tFinishedGoodsFlag as boolean,\n\t\tColor as string,\n\t\tSafetyStockLevel as integer,\n\t\tReorderPoint as integer,\n\t\tStandardCost as decimal(19,4),\n\t\tListPrice as decimal(19,4),\n\t\tSize as string,\n\t\tSizeUnitMeasureCode as string,\n\t\tWeightUnitMeasureCode as string,\n\t\tWeight as decimal(8,2),\n\t\tDaysToManufacture as integer,\n\t\tProductLine as string,\n\t\tClass as string,\n\t\tStyle as string,\n\t\tProductSubcategoryID as integer,\n\t\tProductModelID as integer,\n\t\tSellStartDate as timestamp,\n\t\tSellEndDate as timestamp,\n\t\tDiscontinuedDate as timestamp,\n\t\trowguid as string,\n\t\tModifiedDate as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> ProductStream\nsource(output(\n\t\tProductModelID as integer,\n\t\tName as string,\n\t\tCatalogDescription as string,\n\t\tInstructions as string,\n\t\trowguid as string,\n\t\tModifiedDate as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> ProductModelStream\nsource(output(\n\t\tProductSubcategoryID as integer,\n\t\tProductCategoryID as integer,\n\t\tName as string,\n\t\trowguid as string,\n\t\tModifiedDate as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> ProductSubcategoryStream\nProductStream, ProductModelStream join(ProductStream@ProductModelID == ProductModelStream@ProductModelID,\n\tjoinType:'left',\n\tbroadcast: 'auto')~> ProductProductModelJoin\nProductProductModelJoin, ProductSubcategoryStream join(ProductStream@ProductSubcategoryID == ProductSubcategoryStream@ProductSubcategoryID,\n\tjoinType:'left',\n\tbroadcast: 'auto')~> ProductProductSubCatJoin\nProductProductSubCatJoin alterRow(deleteIf(isNull(ProductStream@ProductModelID))) ~> RemoveNull\nRemoveNull select(mapColumn(\n\t\tProductID,\n\t\tProductName = ProductStream@Name,\n\t\tSafetyStockLevel,\n\t\tProductModelID = ProductModelStream@ProductModelID,\n\t\tProductModelName = ProductModelStream@Name,\n\t\tProductSubcategoryID = ProductSubcategoryStream@ProductSubcategoryID,\n\t\tProductSubCategoryName = ProductSubcategoryStream@Name\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns keyGenerate(output(ProductSK as long),\n\tstartAt: 1L) ~> SurrogateKey\nSurrogateKey sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tProductSK as integer,\n\t\tProductID as integer,\n\t\tProductModelID as integer,\n\t\tProductSubcategoryID as integer,\n\t\tProductName as string,\n\t\tSafetyStockLevel as integer,\n\t\tProductModelName as string,\n\t\tProductSubCategoryName as string\n\t),\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tformat: 'table',\n\tstaged: true,\n\tallowCopyCommand: true,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError',\n\tmapColumn(\n\t\tProductSK,\n\t\tProductID,\n\t\tProductModelID,\n\t\tProductSubcategoryID,\n\t\tProductName,\n\t\tSafetyStockLevel,\n\t\tProductModelName,\n\t\tProductSubCategoryName,\n\t\tProductSK\n\t)) ~> DimProduct"
+					"script": "source(output(\n\t\tProductID as integer,\n\t\tName as string,\n\t\tProductNumber as string,\n\t\tMakeFlag as boolean,\n\t\tFinishedGoodsFlag as boolean,\n\t\tColor as string,\n\t\tSafetyStockLevel as integer,\n\t\tReorderPoint as integer,\n\t\tStandardCost as decimal(19,4),\n\t\tListPrice as decimal(19,4),\n\t\tSize as string,\n\t\tSizeUnitMeasureCode as string,\n\t\tWeightUnitMeasureCode as string,\n\t\tWeight as decimal(8,2),\n\t\tDaysToManufacture as integer,\n\t\tProductLine as string,\n\t\tClass as string,\n\t\tStyle as string,\n\t\tProductSubcategoryID as integer,\n\t\tProductModelID as integer,\n\t\tSellStartDate as timestamp,\n\t\tSellEndDate as timestamp,\n\t\tDiscontinuedDate as timestamp,\n\t\trowguid as string,\n\t\tModifiedDate as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> ProductStream\nsource(output(\n\t\tProductModelID as integer,\n\t\tName as string,\n\t\tCatalogDescription as string,\n\t\tInstructions as string,\n\t\trowguid as string,\n\t\tModifiedDate as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> ProductModelStream\nsource(output(\n\t\tProductSubcategoryID as integer,\n\t\tProductCategoryID as integer,\n\t\tName as string,\n\t\trowguid as string,\n\t\tModifiedDate as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> ProductSubcategoryStream\nsource(output(\n\t\tproductsk as integer\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tquery: 'select max(productsk) as productsk from dbo.[dimproduct]',\n\tformat: 'query',\n\tstaged: true) ~> DimProductStream\nProductStream, ProductModelStream join(ProductStream@ProductModelID == ProductModelStream@ProductModelID,\n\tjoinType:'left',\n\tbroadcast: 'auto')~> ProductProductModelJoin\nProductProductModelJoin, ProductSubcategoryStream join(ProductStream@ProductSubcategoryID == ProductSubcategoryStream@ProductSubcategoryID,\n\tjoinType:'left',\n\tbroadcast: 'auto')~> ProductProductSubCatJoin\nProductProductSubCatJoin alterRow(deleteIf(isNull(ProductStream@ProductModelID))) ~> RemoveNull\nRemoveNull select(mapColumn(\n\t\tProductID,\n\t\tProductName = ProductStream@Name,\n\t\tSafetyStockLevel,\n\t\tProductModelID = ProductModelStream@ProductModelID,\n\t\tProductModelName = ProductModelStream@Name,\n\t\tProductSubcategoryID = ProductSubcategoryStream@ProductSubcategoryID,\n\t\tProductSubCategoryName = ProductSubcategoryStream@Name\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns keyGenerate(output(ProductSK as long),\n\tstartAt: 1L) ~> SurrogateKey\nSurrogateKey derive(ProductSK = ProductSK+ProductSKCache#outputs()[1].productsk) ~> DerivedColumn1\nDerivedColumn1 sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tProductSK as integer,\n\t\tProductID as integer,\n\t\tProductModelID as integer,\n\t\tProductSubcategoryID as integer,\n\t\tProductName as string,\n\t\tSafetyStockLevel as integer,\n\t\tProductModelName as string,\n\t\tProductSubCategoryName as string\n\t),\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tformat: 'table',\n\tstaged: true,\n\tallowCopyCommand: true,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError',\n\tmapColumn(\n\t\tProductSK,\n\t\tProductID,\n\t\tProductModelID,\n\t\tProductSubcategoryID,\n\t\tProductName,\n\t\tSafetyStockLevel,\n\t\tProductModelName,\n\t\tProductSubCategoryName,\n\t\tProductSK\n\t)) ~> DimProduct\nDimProductStream sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\tstore: 'cache',\n\tformat: 'inline',\n\toutput: false,\n\tsaveOrder: 1,\n\tmapColumn(\n\t\tproductsk\n\t)) ~> ProductSKCache"
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DimProductMaxSK')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/DimCustomerPipeline')]",
