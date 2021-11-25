@@ -20,8 +20,18 @@
 				}
 			],
 			"sinks": [],
-			"transformations": [],
-			"script": "source(output(\n\t\tCustomerID as integer,\n\t\tPersonID as integer,\n\t\tStoreID as integer,\n\t\tTerritoryID as integer,\n\t\tAccountNumber as string,\n\t\trowguid as string,\n\t\tModifiedDate as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> CustomerStream\nsource(output(\n\t\tBusinessEntityID as integer,\n\t\tName as string,\n\t\tSalesPersonID as integer,\n\t\tDemographics as string,\n\t\trowguid as string,\n\t\tModifiedDate as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> StoreStream"
+			"transformations": [
+				{
+					"name": "CusStoreJoin"
+				},
+				{
+					"name": "SelectStream"
+				},
+				{
+					"name": "AlterRow1"
+				}
+			],
+			"script": "source(output(\n\t\tCustomerID as integer,\n\t\tPersonID as integer,\n\t\tStoreID as integer,\n\t\tTerritoryID as integer,\n\t\tAccountNumber as string,\n\t\trowguid as string,\n\t\tModifiedDate as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> CustomerStream\nsource(output(\n\t\tBusinessEntityID as integer,\n\t\tName as string,\n\t\tSalesPersonID as integer,\n\t\tDemographics as string,\n\t\trowguid as string,\n\t\tModifiedDate as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> StoreStream\nCustomerStream, StoreStream join(StoreID == BusinessEntityID,\n\tjoinType:'left',\n\tbroadcast: 'auto')~> CusStoreJoin\nCusStoreJoin select(mapColumn(\n\t\tCustomerID,\n\t\tStoreID,\n\t\tBusinessEntityID,\n\t\tName\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectStream\nSelectStream alterRow(deleteIf(isNull(BusinessEntityID))) ~> AlterRow1"
 		}
 	}
 }
