@@ -1965,13 +1965,13 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/LogCSV')]",
+			"name": "[concat(parameters('factoryName'), '/LogTimePipeline')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
 				"activities": [
 					{
-						"name": "Data flow1",
+						"name": "LogTime_df",
 						"type": "ExecuteDataFlow",
 						"dependsOn": [],
 						"policy": {
@@ -1983,6 +1983,15 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
+							"dataflow": {
+								"referenceName": "LogTimeFlow",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"LogCSVStream": {},
+									"sink1": {}
+								}
+							},
 							"staging": {},
 							"compute": {
 								"coreCount": 8,
@@ -1998,7 +2007,9 @@
 				},
 				"annotations": []
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/LogTimeFlow')]"
+			]
 		}
 	]
 }
