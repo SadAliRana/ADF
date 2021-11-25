@@ -1,0 +1,34 @@
+{
+	"name": "CustomerCourse",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSynapseAnalytics",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlDWTable",
+		"schema": [
+			{
+				"name": "customerid",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "customername",
+				"type": "varchar"
+			},
+			{
+				"name": "registered",
+				"type": "bit"
+			},
+			{
+				"name": "courses",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "customercourse"
+		}
+	}
+}
